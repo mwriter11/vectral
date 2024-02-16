@@ -10,12 +10,56 @@ PluginProcessor::PluginProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), treeState(*this, nullptr, "PARAMETERS", createParameterLayout())
 {
+    treeState.addParameterListener(this, "mix");
+    treeState.addParameterListener(this, "time");
+    treeState.addParameterListener(this, "regen");
+    treeState.addParameterListener(this, "mod");
 }
 
 PluginProcessor::~PluginProcessor()
 {
+    treeState.removeParameterListener(this, "mix");
+    treeState.removeParameterListener(this, "time");
+    treeState.removeParameterListener(this, "regen");
+    treeState.removeParameterListener(this, "mod");
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::createParameterLayout()
+{
+    std::vector <std::unique_ptr<juce::RangedAudioParameter>> parameters;
+
+    auto pMix = std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0.0, 24.0, 0.0);
+    auto pTime = std::make_unique<juce::AudioParameterFloat>("time", "Time", 0.0, 24.0, 0.0);
+    auto pRegen = std::make_unique<juce::AudioParameterFloat>("regen", "Regen", 0.0, 24.0, 0.0);
+    auto pMod = std::make_unique<juce::AudioParameterBool>("mod", "Mod", false);
+
+    params.push_back(std::move(pMix));
+    params.push_back(std::move(pTime));
+    params.push_back(std::move(pRegen));
+    params.push_back(std::move(pMod));
+
+    return { params.begin(), params.end() }
+}
+
+void PluginProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (parameterID == "mix") {
+        mix = newValue;
+    }
+
+    if (parameterID == "time") {
+        time = newValue;
+    }
+
+    if (parameterID == "regen") {
+        regen = newValue;
+    }
+
+    if (parameterID == "mod") {
+        mod = newValue; // float -> bool
+    }
 }
 
 //==============================================================================
@@ -89,6 +133,11 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     juce::ignoreUnused (sampleRate, samplesPerBlock);
+
+    mix = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("mix")));
+    time = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("time")));
+    regen = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("regen")));
+    mod = *treeState.getRawParameterValue("mod");
 }
 
 void PluginProcessor::releaseResources()
@@ -137,17 +186,19 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-        juce::ignoreUnused (channelData);
-        // ..do something to the data...
+    // DSP Logic
+    juce::dsp::AudioBlock<float> block (buffer);
+
+    for (int channel = 0; channel < block.getNumChannels(); ++channel) {
+        auto* channelData = block.getChannelPointer(channel);
+
+        for (int sample = 0; sample < block.getNumSamples(); ++sample) {
+            if (mod) {
+                // TODO: Modulation
+            }
+
+            // TODO: Mix, Time, Regen
+        }
     }
 }
 
@@ -159,7 +210,10 @@ bool PluginProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* PluginProcessor::createEditor()
 {
-    return new PluginEditor (*this);
+    // return new PluginEditor (*this);
+
+    // TODO: UI
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -168,14 +222,33 @@ void PluginProcessor::getStateInformation (juce::MemoryBlock& destData)
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
-    juce::ignoreUnused (destData);
+    
+    // Called whenever you hit save
+
+    juce::MemoryOutputStream stream(destData, false);
+    treeState.state.writeToStream(stream);
 }
 
 void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
-    juce::ignoreUnused (data, sizeInBytes);
+    
+    // Called whenever you load the live set
+
+    auto tree = juce::ValueTree::readFromData(data, size_t(sizeInBytes));
+
+    if (tree.isValid()) {
+        // Could get invalid if you have two versions of this plugin and you're making changes
+        // to one. It can do weird stuff.
+
+        treeState.state = tree;
+
+        mix = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("mix")));
+        time = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("time")));
+        regen = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("regen")));
+        mod = *treeState.getRawParameterValue("mod");
+    }
 }
 
 //==============================================================================
