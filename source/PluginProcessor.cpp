@@ -128,6 +128,11 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 }
 
 //==============================================================================
+void PluginProcessor::process (juce::dsp::ProcessContextReplacing<float> context)
+{
+
+}
+
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     // Use this method as the place to do any pre-playback
@@ -135,9 +140,15 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     juce::ignoreUnused (sampleRate, samplesPerBlock);
 
     mix = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("mix")));
-    time = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("time")));
-    regen = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("regen")));
+    time = static_cast<float>(*treeState.getRawParameterValue("time"));
+    regen = static_cast<float>(*treeState.getRawParameterValue("regen"));
     mod = *treeState.getRawParameterValue("mod");
+
+    juce::dsp::ProcessSpec spec;
+
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
 }
 
 void PluginProcessor::releaseResources()
@@ -186,20 +197,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // DSP Logic
     juce::dsp::AudioBlock<float> block (buffer);
 
-    for (int channel = 0; channel < block.getNumChannels(); ++channel) {
-        auto* channelData = block.getChannelPointer(channel);
-
-        for (int sample = 0; sample < block.getNumSamples(); ++sample) {
-            if (mod) {
-                // TODO: Modulation
-            }
-
-            // TODO: Mix, Time, Regen
-        }
-    }
+    process(juce::dsp::ProcessContextReplacing<float> (buffer));
 }
 
 //==============================================================================
@@ -245,8 +245,8 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
         treeState.state = tree;
 
         mix = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("mix")));
-        time = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("time")));
-        regen = juce::Decibels::decibelsToGain(static_cast<float>(*treeState.getRawParameterValue("regen")));
+        time = static_cast<float>(*treeState.getRawParameterValue("time"));
+        regen = static_cast<float>(*treeState.getRawParameterValue("regen"));
         mod = *treeState.getRawParameterValue("mod");
     }
 }
