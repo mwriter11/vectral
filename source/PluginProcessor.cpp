@@ -217,9 +217,16 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
         for (int sampleIndex; sampleIndex < buffer.getNumSamples(); sampleIndex++)
         {
-            // Left off at 14:44 of Spanish delay line example video
+            float delayedSample = delayLine.popSample(channel);
+            float inDelay = inSamples[sampleIndex] + (*parameters.getRawParameterValue("regen") * delayedSample);
+            
+            delayLine.pushSample(channel, inDelay);
+        
+            outSamples[sampleIndex] = inSamples[sampleIndex] + delayedSample;
         }
     }
+
+    // TODO: Handle mix
 }
 
 //==============================================================================
