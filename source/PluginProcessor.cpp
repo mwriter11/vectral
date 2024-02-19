@@ -206,6 +206,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     // process(juce::dsp::ProcessContextReplacing<float> (buffer));
 
     // TODO: Move to process method:
+    
+    // Handle time
     int delayTimeInSamples = *parameters.getRawParameterValue("time") * delayLineSampleRate;
 
     delayLine.setDelay(delayTimeInSamples);
@@ -218,15 +220,18 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         for (int sampleIndex; sampleIndex < buffer.getNumSamples(); sampleIndex++)
         {
             float delayedSample = delayLine.popSample(channel);
+
+            // Handle regen
             float inDelay = inSamples[sampleIndex] + (*parameters.getRawParameterValue("regen") * delayedSample);
             
             delayLine.pushSample(channel, inDelay);
         
+            // Handle mix
+            delayedSample *= *parameters.getRawParameterValue("mix");
+
             outSamples[sampleIndex] = inSamples[sampleIndex] + delayedSample;
         }
     }
-
-    // TODO: Handle mix
 }
 
 //==============================================================================
