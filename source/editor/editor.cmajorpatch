@@ -1,0 +1,17 @@
+{
+    "CmajorVersion":    1,
+    "ID":               "mwriter.vectral",
+    "version":          "1.0",
+    "name":             "Vectral Delay Plugin",
+    "description":      "A delay plugin",
+    "category":         "effect",
+    "manufacturer":     "MWriter",
+    "isInstrument":     false,
+
+    "view":             {
+                            "src": "./index.js",
+                            "width": 500,
+                            "height": 250,
+                            "resizable": false
+                        }
+}
